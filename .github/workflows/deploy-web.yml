@@ -1,0 +1,70 @@
+name: Deploy web build to GitHub Pages
+
+# Publishes the browser build (src/Game.Web) to GitHub Pages. Requires WasmEnableThreads
+# (real background Thread paced by Game.Core's ThreadPump, unmodified from the desktop host) plus
+# the vendored coi-serviceworker shim to unlock crossOriginIsolated/SharedArrayBuffer, since GitHub
+# Pages cannot set the required COOP/COEP response headers itself. Both were validated end to end
+# on this exact repo's Pages site via the earlier src/Game.Web.Spike throwaway project before this
+# workflow was retargeted at the real game.
+#
+# One-time setup this workflow depends on (not done by the workflow itself):
+# Settings -> Pages -> Build and deployment -> Source -> "GitHub Actions".
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - 'src/Game.Web/**'
+      - 'src/Game.Core/**'
+      - 'src/Game.Shared/**'
+      - '.github/workflows/deploy-web.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Publish web build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Install WebAssembly workloads
+        run: dotnet workload install wasm-tools wasm-experimental
+
+      - name: Publish web build
+        run: dotnet publish src/Game.Web/Game.Web.csproj --configuration Release --output artifacts/web-publish
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: artifacts/web-publish/wwwroot
+
+  deploy:
+    name: Deploy to GitHub Pages
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

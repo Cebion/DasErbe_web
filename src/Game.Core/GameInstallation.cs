@@ -1,4 +1,4 @@
-using System.Security.Cryptography;
+using Game.Shared.IO;
 using Game.Shared.Resources.Management;
 
 namespace Game;
@@ -36,7 +36,7 @@ internal static class GameInstallation
         }
 
         using var stream = exeEntry.OpenRead();
-        var actualMd5 = Convert.ToHexString(MD5.HashData(stream)).ToLowerInvariant();
+        var actualMd5 = Convert.ToHexString(PortableMd5.ComputeHash(stream)).ToLowerInvariant();
         if (!string.Equals(actualMd5, ExeMd5, StringComparison.OrdinalIgnoreCase))
         {
             throw new InvalidDataException(

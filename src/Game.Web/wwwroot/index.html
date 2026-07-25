@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <title>Das Erbe (web)</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="preload" id="webassembly" />
+  <script type="importmap"></script>
+  <!-- Must load and register before anything else fetches the wasm/runtime assets: unlocks
+       crossOriginIsolated/SharedArrayBuffer on static hosts (e.g. GitHub Pages) that cannot set
+       COOP/COEP response headers themselves. Causes one extra reload on first visit. -->
+  <script src="coi-serviceworker#[.{fingerprint}].js"></script>
+  <script type='module' src="main#[.{fingerprint}].js"></script>
+  <style>
+    body {
+      background: #111;
+      color: #ddd;
+      font-family: sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 1rem;
+    }
+
+    #screen {
+      width: 640px;
+      height: 480px;
+      max-width: 100%;
+      image-rendering: pixelated;
+      background: black;
+      border: 1px solid #444;
+    }
+  </style>
+</head>
+
+<body>
+  <canvas id="screen" width="320" height="200"></canvas>
+  <p id="status">loading...</p>
+</body>
+
+</html>
