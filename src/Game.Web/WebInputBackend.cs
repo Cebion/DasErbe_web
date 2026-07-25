@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices.JavaScript;
+using System.Threading.Tasks;
 using Game.Shared.Host;
 using Game.Shared.Host.Input;
 using Game.Shared.Input;
@@ -9,10 +10,16 @@ namespace Game.Web;
 
 /// <summary>
 ///     Polls browser mouse/keyboard input into host-neutral frames. JS pushes raw events into static state via
-///     [JSExport] hooks (mousemove/mousedown/mouseup/keydown/keyup all fire on the browser's single main thread,
-///     same as the Poll() caller), mirroring Game.Desktop's MonoGameInputBackend but event-driven instead of
-///     polling a global keyboard/mouse snapshot.
+///     [JSExport] hooks, mirroring Game.Desktop's MonoGameInputBackend but event-driven instead of polling a
+///     global keyboard/mouse snapshot.
 /// </summary>
+/// <remarks>
+///     Every [JSExport] hook here returns <see cref="Task" /> rather than <see langword="void" />: under
+///     WasmEnableThreads, the .NET runtime's execution context is not the browser's main JS thread, and calling
+///     a synchronous (void-returning) [JSExport] method throws "Cannot call synchronous C# methods" at runtime
+///     (confirmed on a real deployed build, not just from documentation) - only Task-returning exports can be
+///     dispatched. The bodies do no actual awaiting; they return <see cref="Task.CompletedTask" />.
+/// </remarks>
 public sealed partial class WebInputBackend : IInputBackend
 {
     private static readonly HashSet<InputKey> HeldKeys = [];
@@ -61,53 +68,58 @@ public sealed partial class WebInputBackend : IInputBackend
     }
 
     [JSExport]
-    internal static void OnMouseMove(double x, double y, double boundsWidth, double boundsHeight)
+    internal static Task OnMouseMove(double x, double y, double boundsWidth, double boundsHeight)
     {
         _mouseX = x;
         _mouseY = y;
         _boundsWidth = boundsWidth;
         _boundsHeight = boundsHeight;
         _isPointerInsideCanvas = true;
+        return Task.CompletedTask;
     }
 
     [JSExport]
-    internal static void OnMouseLeave()
+    internal static Task OnMouseLeave()
     {
         _isPointerInsideCanvas = false;
+        return Task.CompletedTask;
     }
 
     [JSExport]
-    internal static void OnMouseButton(bool isPrimaryDown)
+    internal static Task OnMouseButton(bool isPrimaryDown)
     {
         _isPrimaryDown = isPrimaryDown;
+        return Task.CompletedTask;
     }
 
     [JSExport]
-    internal static void OnKeyDown(string code)
+    internal static Task OnKeyDown(string code)
     {
         if (TryMapHeldKey(code, out var heldKey))
         {
             HeldKeys.Add(heldKey);
         }
 
-        if (!TryMapKeyStroke(code, out var stroke))
+        if (TryMapKeyStroke(code, out var stroke))
         {
-            return;
+            lock (QueuedKeyStrokes)
+            {
+                QueuedKeyStrokes.Enqueue(stroke);
+            }
         }
 
-        lock (QueuedKeyStrokes)
-        {
-            QueuedKeyStrokes.Enqueue(stroke);
-        }
+        return Task.CompletedTask;
     }
 
     [JSExport]
-    internal static void OnKeyUp(string code)
+    internal static Task OnKeyUp(string code)
     {
         if (TryMapHeldKey(code, out var heldKey))
         {
             HeldKeys.Remove(heldKey);
         }
+
+        return Task.CompletedTask;
     }
 
     private static bool TryMapHeldKey(string code, out InputKey key)

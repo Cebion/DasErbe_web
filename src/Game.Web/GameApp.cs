@@ -48,12 +48,17 @@ internal static partial class GameApp
     ///     high-resolution timestamp (milliseconds).
     /// </summary>
     /// <param name="timestampMs">The requestAnimationFrame callback's high-resolution timestamp, in milliseconds.</param>
+    /// <remarks>
+    ///     Returns <see cref="Task" /> rather than <see langword="void" /> because under WasmEnableThreads a
+    ///     synchronous (void-returning) [JSExport] throws "Cannot call synchronous C# methods" at runtime -
+    ///     confirmed on a real deployed build. No actual awaiting happens inside.
+    /// </remarks>
     [JSExport]
-    internal static void Tick(double timestampMs)
+    internal static Task Tick(double timestampMs)
     {
         if (_host is null)
         {
-            return;
+            return Task.CompletedTask;
         }
 
         if (_lastTimestampMs < 0)
@@ -73,6 +78,8 @@ internal static partial class GameApp
             ReportStatus($"Runtime error: {ex}");
             throw;
         }
+
+        return Task.CompletedTask;
     }
 
     [JSImport("app.reportStatus", "main.js")]

@@ -56,20 +56,28 @@ const exports = await getAssemblyExports('Game.Web');
 const gameApp = exports.Game.Web.GameApp;
 const inputBackend = exports.Game.Web.WebInputBackend;
 
+// Every [JSExport] hook now returns a Task/Promise - under WasmEnableThreads a synchronous
+// (void-returning) JSExport throws "Cannot call synchronous C# methods" at runtime, since .NET's
+// execution context is not the browser's main JS thread. These are trivial state setters, so
+// fire-and-forget with a logged rejection is fine; only the render loop actually awaits (below).
+function callFireAndForget(promise) {
+    promise.catch(err => console.error('input call failed', err));
+}
+
 canvas.addEventListener('mousemove', e => {
     const rect = canvas.getBoundingClientRect();
     const scaleX = canvas.width / rect.width;
     const scaleY = canvas.height / rect.height;
     const x = (e.clientX - rect.left) * scaleX;
     const y = (e.clientY - rect.top) * scaleY;
-    inputBackend.OnMouseMove(x, y, canvas.width, canvas.height);
+    callFireAndForget(inputBackend.OnMouseMove(x, y, canvas.width, canvas.height));
 });
-canvas.addEventListener('mouseleave', () => inputBackend.OnMouseLeave());
+canvas.addEventListener('mouseleave', () => callFireAndForget(inputBackend.OnMouseLeave()));
 canvas.addEventListener('mousedown', e => {
-    if (e.button === 0) inputBackend.OnMouseButton(true);
+    if (e.button === 0) callFireAndForget(inputBackend.OnMouseButton(true));
 });
 window.addEventListener('mouseup', e => {
-    if (e.button === 0) inputBackend.OnMouseButton(false);
+    if (e.button === 0) callFireAndForget(inputBackend.OnMouseButton(false));
 });
 
 const handledKeyCodes = new Set([
@@ -79,11 +87,11 @@ const handledKeyCodes = new Set([
 ]);
 window.addEventListener('keydown', e => {
     if (handledKeyCodes.has(e.code)) e.preventDefault();
-    inputBackend.OnKeyDown(e.code);
+    callFireAndForget(inputBackend.OnKeyDown(e.code));
 });
 window.addEventListener('keyup', e => {
     if (handledKeyCodes.has(e.code)) e.preventDefault();
-    inputBackend.OnKeyUp(e.code);
+    callFireAndForget(inputBackend.OnKeyUp(e.code));
 });
 
 // run the C# Main() method, which keeps the runtime process running for further API calls
@@ -91,8 +99,8 @@ const runMainPromise = runMain();
 
 await gameApp.Boot();
 
-function frame(timestampMs) {
-    gameApp.Tick(timestampMs);
+async function frame(timestampMs) {
+    await gameApp.Tick(timestampMs);
     requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
