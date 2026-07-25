@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<!--  Licensed to the .NET Foundation under one or more agreements. -->
+<!-- The .NET Foundation licenses this file to you under the MIT license. -->
+<html>
+
+<head>
+  <title>Game.Web.Spike</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="preload" id="webassembly" />
+  <script type="importmap"></script>
+  <!-- Must load and register before anything else fetches the wasm/runtime assets: unlocks
+       crossOriginIsolated/SharedArrayBuffer on static hosts (e.g. GitHub Pages) that cannot set
+       COOP/COEP response headers themselves. Causes one extra reload on first visit. -->
+  <script src="coi-serviceworker#[.{fingerprint}].js"></script>
+  <script type='module' src="main#[.{fingerprint}].js"></script>
+</head>
+
+<body>
+  <h1>Das Erbe web render-backend spike</h1>
+  <p>Bulk-buffer JSImport &rarr; canvas putImageData test pattern (320x240, scaled 2x):</p>
+  <canvas id="screen" width="320" height="240"
+    style="width:640px;height:480px;image-rendering:pixelated;border:1px solid #444;"></canvas>
+  <p id="stats"><i>loading...</i></p>
+  <p id="threads"><i>loading...</i></p>
+</body>
+
+</html>
