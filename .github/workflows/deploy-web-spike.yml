@@ -1,0 +1,70 @@
+name: Deploy web spike to GitHub Pages
+
+# Publishes the browser render/threading spike (src/Game.Web.Spike) to GitHub Pages, to validate
+# the feasibility plan's riskiest unknowns on a real static host: does the bulk-buffer JSImport
+# canvas render loop run at an acceptable framerate, and does WasmEnableThreads + the vendored
+# coi-serviceworker shim actually unlock crossOriginIsolated/SharedArrayBuffer without any
+# server-side header support (which GitHub Pages cannot provide natively).
+#
+# This targets the throwaway spike project, not the real game. Repoint the publish step at
+# src/Game.Web/Game.Web.csproj once that host project exists.
+#
+# One-time setup this workflow depends on (not done by the workflow itself):
+# Settings -> Pages -> Build and deployment -> Source -> "GitHub Actions".
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - 'src/Game.Web.Spike/**'
+      - '.github/workflows/deploy-web-spike.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Publish spike
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Install WebAssembly workloads
+        run: dotnet workload install wasm-tools wasm-experimental
+
+      - name: Publish web spike
+        run: dotnet publish src/Game.Web.Spike/Game.Web.Spike.csproj --configuration Release --output artifacts/web-spike-publish
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: artifacts/web-spike-publish/wwwroot
+
+  deploy:
+    name: Deploy to GitHub Pages
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
